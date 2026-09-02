@@ -1,0 +1,24 @@
+[package]
+name = "pendulum-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bit-set = "0.11.1"
+bytemuck = "1.25.2"
+delegate = "0.13.5"
+egui = "0.36.2"
+egui-wgpu = "0.36.2"
+egui-winit = "0.36.2"
+env_logger = "0.11.11"
+glam = { version = "0.33.6", features = ["bytemuck", "zerocopy"] }
+itertools = "0.15.0"
+log = "0.4.34"
+num-traits = "0.2.19"
+smol = "2.0.2"
+wgpu = { version = "30.0.1", features = ["spirv"] }
+winit = "0.30.13"
+
+[build-dependencies]
+walkdir = "2.5.0"
+which = "8.0.6"
