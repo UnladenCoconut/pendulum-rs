@@ -1,6 +1,7 @@
 use std::{
     f32::consts::{FRAC_PI_6, PI},
     ops::Mul,
+    u32,
 };
 
 use bytemuck::{Pod, Zeroable, cast_slice};
@@ -20,16 +21,6 @@ use crate::util::linspace;
 /// glam tends to perform best for single ops, and ultraviolet for batched ops
 
 pub type Vertex = glam::f32::Vec4;
-
-// #[derive(Clone, Copy, Zeroable, Pod)]
-// #[repr(C)]
-// pub struct Vertex([f32; 4]);
-
-// impl Vertex {
-//     fn new(x: f32, y: f32, z: f32, w: f32) -> Self {
-//         Vertex([x, y, z, w])
-//     }
-// }
 
 pub struct MeshDataDescriptor {}
 
@@ -54,8 +45,8 @@ impl MeshDataDescriptor {
         //cull_mode: Some(wgpu::Face::Back)
         cull_mode: None,
         unclipped_depth: false,
-        //polygon_mode: wgpu::PolygonMode::Fill,
-        polygon_mode: wgpu::PolygonMode::Line, //wireframe
+        polygon_mode: wgpu::PolygonMode::Fill,
+        //polygon_mode: wgpu::PolygonMode::Line, //wireframe
         conservative: false,
     };
 }
@@ -149,9 +140,70 @@ pub fn cube() -> Mesh {
 }
 
 /// for uniform surface subdivision, formed by pie slicing
-// pub fn cylinder(subdivision_level: u32) -> Mesh {
+pub fn polygonal_prism(sides: u32) -> Mesh {
+    let sides = sides.clamp(3, u32::MAX);
 
-// }
+    let vtx = linspace::<f32, f32>(0.0, 2.0 * PI, (sides + 1) as usize)
+        .skip(1)
+        .map(|a| {
+            [
+                Vertex::new(a.sin() * 2.0, 1.0, a.cos() * 2.0, 1.0),
+                Vertex::new(a.sin() * 2.0, -1.0, a.cos() * 2.0, 1.0),
+            ]
+        });
+    let mut vtx: Vec<_> = vtx.flatten().collect();
+
+    let mut idx = Vec::with_capacity(vtx.len() - 2);
+
+    (0u32..vtx.len() as u32)
+        .tuple_windows::<(_, _, _, _)>()
+        .step_by(2)
+        .for_each(|x| {
+            // triangle strip looks like this as we start from top vertex:
+            // \/\/ ...
+            // second triangle, need to rearrange points otherwise would not be ccw
+            idx.push(TriangleIdxSet(x.0, x.1, x.2));
+            idx.push(TriangleIdxSet(x.1, x.3, x.2));
+        });
+    idx.push(TriangleIdxSet(
+        (vtx.len() - 2) as u32,
+        (vtx.len() - 1) as u32,
+        0,
+    ));
+    idx.push(TriangleIdxSet((vtx.len() - 1) as u32, 1u32, 0));
+
+
+    //top and bottom points for center of circle
+    vtx.push(Vertex::new(0.0,1.0,0.0,1.0));
+    vtx.push(Vertex::new(0.0,-1.0,0.0,1.0));
+
+    let vl = vtx.len() as u32;
+
+    //top  and bottom circles
+    (0u32..idx.len() as u32)
+        .step_by(2)
+        .tuple_windows::<(_, _)>()
+        .for_each(|x| {
+            idx.push(TriangleIdxSet(vl-2, x.0, x.1));
+        });
+
+    (1u32..idx.len() as u32)
+        .step_by(2)
+        .tuple_windows::<(_, _)>()
+        .for_each(|x| {
+            idx.push(TriangleIdxSet(vl-1, x.0, x.1));
+        });
+
+    // TODO
+    //assert!(idx.len() == vtx.len(), "mesh idx list size did not match expected" );
+
+    Mesh {
+        vertices: vtx,
+        indices: idx,
+    }
+}
+
+//we can do better by placing a triangle in the circle center then further circles on the edges
 
 // /// for uniform surface subdivision. formed by face subdivision of icosahedron
 pub fn icosahedron() -> Mesh {

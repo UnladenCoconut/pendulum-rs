@@ -31,7 +31,7 @@ fn main() {
         })
         .for_each(|x| {
             println!("cargo::rerun-if-changed={}", x.path().display());
-            println!("cargo::warning=rebuilding shader {}",x.path().display());
+            println!("cargo::warning=rebuilding shader {}", x.path().display());
 
             let mut xpb = PathBuf::from(x.path());
             xpb.set_extension("spirv");

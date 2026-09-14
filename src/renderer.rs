@@ -4,8 +4,8 @@ use bytemuck::cast_slice;
 use glam::Mat4;
 use smol::future;
 use wgpu::{
-    *,
     util::{BufferInitDescriptor, DeviceExt, new_instance_with_webgpu_detection},
+    *,
 };
 use winit::window::Window;
 
@@ -22,6 +22,8 @@ pub struct Renderer {
     pub shader: ShaderModule,
     pub render_pipeline: RenderPipeline,
     pub mesh_alloc: MeshAllocation,
+    pub bind_layout: BindGroupLayout,
+    pub format: TextureFormat,
 
     pub transform_bg: BindGroup,
     pub camera_transform_buffer: Buffer,
@@ -36,6 +38,46 @@ impl Renderer {
             label: Some("Vertex Buffer"),
             contents: bytemuck::cast_slice(vtx_data),
             usage: BufferUsages::VERTEX,
+        })
+    }
+
+    pub fn render_pipeline(
+        shader: &ShaderModule,
+        device: &Device,
+        bind_layouts: &[Option<&BindGroupLayout>],
+        format: TextureFormat,
+        primitive_state: PrimitiveState,
+    ) -> RenderPipeline {
+        let render_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: bind_layouts,
+            immediate_size: 0,
+        });
+
+        device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[Some(MeshDataDescriptor::LAYOUT)], //TODO add vertex buffers here
+                compilation_options: PipelineCompilationOptions::default(),
+            },
+            primitive: primitive_state,
+            depth_stencil: None,
+            cache: None,
+            multiview_mask: None,
+            multisample: MultisampleState::default(),
+            fragment: Some(FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                compilation_options: PipelineCompilationOptions::default(),
+                targets: &[Some(ColorTargetState {
+                    format: format,
+                    blend: None,
+                    write_mask: ColorWrites::ALL,
+                })],
+            }),
         })
     }
 
@@ -90,7 +132,8 @@ impl Renderer {
 
             ////////////////////// shader stuff //////////////////////
 
-            let shader = device.create_shader_module(include_spirv!(concat!(env!("OUT_DIR"),"/shader.spirv")));
+            let shader = device
+                .create_shader_module(include_spirv!(concat!(env!("OUT_DIR"), "/shader.spirv")));
 
             let camera_transform_buffer = device.create_buffer_init(&BufferInitDescriptor {
                 label: Some("Camera Matrix Uniform"),
@@ -149,46 +192,24 @@ impl Renderer {
                 ],
             });
 
-            ////////////////////////////////////////////////////////s
-
-            let render_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[Some(&bind_layout)],
-                immediate_size: 0,
-            });
-
-            let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
-                label: Some("Render Pipeline"),
-                layout: Some(&render_pipeline_layout),
-                vertex: VertexState {
-                    module: &shader,
-                    entry_point: Some("vs_main"),
-                    buffers: &[Some(MeshDataDescriptor::LAYOUT)], //TODO add vertex buffers here
-                    compilation_options: PipelineCompilationOptions::default(),
-                },
-                primitive: MeshDataDescriptor::PRIMITIVE_STATE,
-                depth_stencil: None,
-                cache: None,
-                multiview_mask: None,
-                multisample: MultisampleState::default(),
-                fragment: Some(FragmentState {
-                    module: &shader,
-                    entry_point: Some("fs_main"),
-                    compilation_options: PipelineCompilationOptions::default(),
-                    targets: &[Some(ColorTargetState {
-                        format: format,
-                        blend: None,
-                        write_mask: ColorWrites::ALL,
-                    })],
-                }),
-            });
-
+            ////////////////////////////////////////////////////////
             let gui = GUI::new(&device, &window);
+
+            let render_pipeline = Self::render_pipeline(
+                &shader,
+                &device,
+                &[Some(&bind_layout)],
+                format,
+                PrimitiveState {
+                    polygon_mode: gui.polygon_mode(),
+                    ..MeshDataDescriptor::PRIMITIVE_STATE
+                },
+            );
 
             Renderer {
                 window: window,
                 _instance: instance,
-                mesh_alloc: MeshAllocation::new(&device, &sphere(gui.subdivisions)),
+                mesh_alloc: MeshAllocation::new(&device, &&polygonal_prism(gui.subdivisions)),
                 device: device,
                 queue: queue,
                 surface: surface,
@@ -200,12 +221,28 @@ impl Renderer {
                 camera_transform_buffer: camera_transform_buffer,
                 object_transform_buffer: object_transform_buffer,
 
+                bind_layout: bind_layout,
+                format: format,
+
                 gui: gui,
             }
         }
     }
 
     pub fn pass(&mut self) {
+        if self.gui.wireframe_mode_dirty {
+            self.render_pipeline = Self::render_pipeline(
+                &self.shader,
+                &self.device,
+                &[Some(&self.bind_layout)],
+                self.format,
+                PrimitiveState {
+                    polygon_mode: self.gui.polygon_mode(),
+                    ..MeshDataDescriptor::PRIMITIVE_STATE
+                },
+            );
+        }
+
         let output = self.surface.get_current_texture();
         if let CurrentSurfaceTexture::Success(output) = output {
             let view = output
@@ -245,7 +282,7 @@ impl Renderer {
 
                 if self.gui.mesh_dirty {
                     self.mesh_alloc =
-                        MeshAllocation::new(&self.device, &sphere(self.gui.subdivisions));
+                        MeshAllocation::new(&self.device, &polygonal_prism(self.gui.subdivisions));
                     render_pass.set_vertex_buffer(
                         MeshDataDescriptor::ATTRIBUTE.shader_location,
                         self.mesh_alloc.vtx_buffer.slice(..),

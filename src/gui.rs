@@ -14,9 +14,18 @@ pub struct GUI {
     //data
     pub mesh_dirty: bool,
     pub subdivisions: u32,
+    pub wireframe_mode: bool,
+    pub wireframe_mode_dirty: bool,
 }
 
 impl GUI {
+    pub fn polygon_mode(&self) -> wgpu::PolygonMode {
+        match self.wireframe_mode {
+            true => wgpu::PolygonMode::Line,
+            false => wgpu::PolygonMode::Fill,
+        }
+    }
+
     pub fn new(device: &Device, display_target: &dyn HasDisplayHandle) -> Self {
         let ctx = egui::Context::default();
         Self {
@@ -42,6 +51,8 @@ impl GUI {
 
             subdivisions: 2,
             mesh_dirty: true,
+            wireframe_mode: true,
+            wireframe_mode_dirty: false,
         }
     }
 
@@ -61,13 +72,20 @@ impl GUI {
                 .default_pos(egui::pos2(700.0, 100.0))
                 .default_open(true)
                 .show(&self.context, |ui| {
-                    ui.add(egui::Label::new("hello!"));
+                    if ui
+                        .checkbox(&mut self.wireframe_mode, "wireframe mode")
+                        .changed()
+                    {
+                        self.wireframe_mode_dirty |= true;
+                        ui.ctx().request_repaint();
+                    }
+                    ui.add(egui::Label::new("mesh subdivisions:"));
                     let response = ui.add(egui::Slider::new(
                         &mut self.subdivisions,
                         RangeInclusive::new(0, 10),
                     ));
                     if response.changed() {
-                        self.mesh_dirty = true;
+                        self.mesh_dirty |= true;
                         ui.ctx().request_repaint();
                     }
                 });
