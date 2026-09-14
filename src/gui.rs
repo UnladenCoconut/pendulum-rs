@@ -1,10 +1,13 @@
 use std::ops::RangeInclusive;
 
 use egui_wgpu::ScreenDescriptor;
+use strum::IntoEnumIterator;
 use wgpu::{
     CommandEncoder, Device, Queue, RenderPassColorAttachment, RenderPassDescriptor,
     rwh::HasDisplayHandle,
 };
+
+use crate::geometry::Geometries;
 
 pub struct GUI {
     pub context: egui::Context,
@@ -16,13 +19,18 @@ pub struct GUI {
     pub subdivisions: u32,
     pub wireframe_mode: bool,
     pub wireframe_mode_dirty: bool,
+
+    pub selected_geometry: Geometries,
+    pub selected_geometry_dirty: bool,
 }
 
 impl GUI {
+
+    //TODO cant use this on webgpu
     pub fn polygon_mode(&self) -> wgpu::PolygonMode {
         match self.wireframe_mode {
-            true => wgpu::PolygonMode::Line,
-            false => wgpu::PolygonMode::Fill,
+            //true => wgpu::PolygonMode::Line,
+            _ => wgpu::PolygonMode::Fill,
         }
     }
 
@@ -53,6 +61,9 @@ impl GUI {
             mesh_dirty: true,
             wireframe_mode: true,
             wireframe_mode_dirty: false,
+            selected_geometry: Geometries::Sphere,
+            selected_geometry_dirty: true,
+
         }
     }
 
@@ -88,16 +99,32 @@ impl GUI {
                         self.mesh_dirty |= true;
                         ui.ctx().request_repaint();
                     }
+
+
+                    let before = self.selected_geometry.clone();
+                    egui::ComboBox::from_label("Mesh Geometry")
+                    .selected_text(self.selected_geometry.to_string())
+                    .show_ui(ui, |ui| {
+                        Geometries::iter().for_each(|e| {
+                            ui.selectable_value(
+                                &mut self.selected_geometry,
+                                e.clone(),
+                                e.to_string(),
+                            );
+                        });
+                    });
+                    if before != self.selected_geometry {
+                        self.mesh_dirty = true;
+                    }
+
                 });
         });
 
         let primitives = self
             .context
             .tessellate(output.shapes, output.pixels_per_point);
-        output.textures_delta.set.iter().for_each(|(id, deltas)| {
-            deltas.iter().for_each(|delta| {
-                self.renderer.update_texture(device, queue, *id, delta);
-            });
+        output.textures_delta.set.iter().for_each(|(id, delta)| {
+            self.renderer.update_texture(device, queue, *id, delta);
         });
 
         output.textures_delta.free.iter().for_each(|id| {

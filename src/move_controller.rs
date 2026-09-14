@@ -1,5 +1,10 @@
 use core::f32;
+
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
+
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
 use bit_set::BitSet;
 use glam::{Mat4, Quat, Vec3};

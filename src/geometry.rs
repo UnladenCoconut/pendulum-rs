@@ -42,8 +42,8 @@ impl MeshDataDescriptor {
         topology: PrimitiveTopology::TriangleList,
         strip_index_format: None,
         front_face: wgpu::FrontFace::Ccw,
-        //cull_mode: Some(wgpu::Face::Back)
-        cull_mode: None,
+        cull_mode: Some(wgpu::Face::Back),
+        //cull_mode: None,
         unclipped_depth: false,
         polygon_mode: wgpu::PolygonMode::Fill,
         //polygon_mode: wgpu::PolygonMode::Line, //wireframe
@@ -147,8 +147,8 @@ pub fn polygonal_prism(sides: u32) -> Mesh {
         .skip(1)
         .map(|a| {
             [
-                Vertex::new(a.sin() * 2.0, 1.0, a.cos() * 2.0, 1.0),
-                Vertex::new(a.sin() * 2.0, -1.0, a.cos() * 2.0, 1.0),
+                Vertex::new(a.sin(), 1.0, a.cos(), 1.0),
+                Vertex::new(a.sin(), -1.0, a.cos(), 1.0),
             ]
         });
     let mut vtx: Vec<_> = vtx.flatten().collect();
@@ -172,10 +172,9 @@ pub fn polygonal_prism(sides: u32) -> Mesh {
     ));
     idx.push(TriangleIdxSet((vtx.len() - 1) as u32, 1u32, 0));
 
-
     //top and bottom points for center of circle
-    vtx.push(Vertex::new(0.0,1.0,0.0,1.0));
-    vtx.push(Vertex::new(0.0,-1.0,0.0,1.0));
+    vtx.push(Vertex::new(0.0, 1.0, 0.0, 1.0));
+    vtx.push(Vertex::new(0.0, -1.0, 0.0, 1.0));
 
     let vl = vtx.len() as u32;
 
@@ -184,14 +183,14 @@ pub fn polygonal_prism(sides: u32) -> Mesh {
         .step_by(2)
         .tuple_windows::<(_, _)>()
         .for_each(|x| {
-            idx.push(TriangleIdxSet(vl-2, x.0, x.1));
+            idx.push(TriangleIdxSet(vl - 2, x.0, x.1));
         });
 
     (1u32..idx.len() as u32)
         .step_by(2)
         .tuple_windows::<(_, _)>()
         .for_each(|x| {
-            idx.push(TriangleIdxSet(vl-1, x.0, x.1));
+            idx.push(TriangleIdxSet(vl - 1, x.0, x.1));
         });
 
     // TODO
@@ -312,17 +311,23 @@ pub fn subdivide_mesh(mesh: Mesh, subdivision_level: u32) -> Mesh {
             let mut tl_tr_strip_points = linspace::<f32, _>(lhi_prev, rhi_prev, i + 1);
             let mut bl_br_strip_points = linspace::<f32, _>(lhi, rhi, i + 2);
 
-            for (a, b, c) in tl_tr_strip_points
+            for (i, (a, b, c)) in tl_tr_strip_points
                 .by_ref()
                 .zip(bl_br_strip_points.by_ref())
                 .flat_map(|(a, b)| [b, a])
                 .tuple_windows::<(_, _, _)>()
+                .enumerate()
             {
                 let vprev = new_vertices.len() as u32;
 
                 new_vertices.extend([a, b, c]);
 
-                new_indexes.push(TriangleIdxSet(vprev, vprev + 2, vprev + 1));
+                if i % 2 == 0 {
+                    new_indexes.push(TriangleIdxSet(vprev, vprev + 2, vprev + 1));
+                } else {
+                    // reverse needed to maintain for ccw
+                    new_indexes.push(TriangleIdxSet(vprev, vprev + 1, vprev + 2));
+                }
             }
 
             let vprev = new_vertices.len() as u32;
@@ -395,3 +400,22 @@ fn validate_meshes() {
 }
 
 //TODO: clipping
+
+#[derive(strum_macros::Display, strum_macros::EnumIter, Clone, Copy, PartialEq, Eq)]
+pub enum Geometries {
+    Sphere,
+    #[strum(to_string = "Polygonal Prism")]
+    PolygonalPrism,
+    Cube,
+}
+
+impl Geometries {
+    //idk about the subdivision level parameter here, its not always applicable
+    pub fn mesh(self, subdivision_level: u32) -> Mesh {
+        match self {
+            Self::Sphere => sphere(subdivision_level),
+            Self::Cube => cube(),
+            Self::PolygonalPrism => polygonal_prism(subdivision_level),
+        }
+    }
+}  

@@ -1,4 +1,10 @@
-use std::{cell::LazyCell, time::Instant};
+use std::{cell::LazyCell};
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
+
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
 use bit_set::BitSet;
 use delegate::delegate;
@@ -7,7 +13,7 @@ use glam::{Mat4, Quat, Vec3};
 use crate::move_controller::MoveControl;
 
 pub const Z_MAPPING_MAT: LazyCell<Mat4> = LazyCell::new(|| {
-    glam::camera::lh::proj::directx::orthographic(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0)
+    glam::camera::lh::proj::directx::orthographic(-1.0, 1.0, -1.0, 1.0, 1.0, -1.0)
 });
 
 pub struct Camera {
@@ -22,13 +28,6 @@ impl Camera {
             pub fn trans_dir(&self, pressed_keys: &BitSet) -> Vec3;
         }
     }
-
-    // pub fn update(&mut self, pressed_keys: &BitSet) -> Mat4 {
-    //     self.projection.mul_mat4(
-    //         &Z_MAPPING_MAT.mul_mat4(
-    //         &self.move_control.update(pressed_keys)
-    //     ))
-    // }
 
     pub fn new(mut move_control: MoveControl) -> Self {
         move_control.angular_velocity -= 1.0;

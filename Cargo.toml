@@ -7,18 +7,40 @@ edition = "2024"
 bit-set = "0.11.1"
 bytemuck = "1.25.2"
 delegate = "0.13.5"
-egui = "0.36.2"
-egui-wgpu = "0.36.2"
-egui-winit = "0.36.2"
-env_logger = "0.11.11"
+
 glam = { version = "0.33.6", features = ["bytemuck", "zerocopy"] }
 itertools = "0.15.0"
 log = "0.4.34"
 num-traits = "0.2.19"
-smol = "2.0.2"
-wgpu = { version = "30.0.1", features = ["spirv"] }
+strum = "0.28.0"
+strum_macros = "0.28.0"
 winit = "0.30.13"
+#pinned to last working wasm-compatible versions
+wgpu = { version = "29.0.4", features = ["spirv"] }
+egui = "0.35"
+egui-wgpu = "0.35"
+egui-winit = { version = "0.35", default-features = false }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+env_logger = "0.11.11"
+smol = "2.0.2"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_log = "1.0"
+console_error_panic_hook = "0.1"
+wasm-bindgen = "0.2.128"
+wasm-bindgen-futures = "0.4.78"
+futures = "0.3.34"
+web-time = "1.1.0"
 
 [build-dependencies]
 walkdir = "2.5.0"
 which = "8.0.6"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "pendulum"
+
+[[bin]]
+name = "pendulum_native"
+path = "src/main.rs"

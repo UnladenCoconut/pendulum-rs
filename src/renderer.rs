@@ -2,7 +2,6 @@ use std::{num::NonZero, sync::Arc};
 
 use bytemuck::cast_slice;
 use glam::Mat4;
-use smol::future;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt, new_instance_with_webgpu_detection},
     *,
@@ -13,7 +12,6 @@ use crate::geometry::*;
 use crate::gui::GUI;
 
 pub struct Renderer {
-    pub window: Arc<Window>,
     pub _instance: Instance,
     pub device: Device,
     pub queue: Queue,
@@ -30,6 +28,12 @@ pub struct Renderer {
     pub object_transform_buffer: Buffer,
 
     pub gui: GUI,
+
+    //make sure this is the last field in the struct so that it is dropped last, s.t.
+    // wgpu context is dropeed before closing winit context
+    //otherwise will segfault on app close
+    //TODO this shouldnt be here anyway if you got your lifetimes right
+    pub window: Arc<Window>,
 }
 
 impl Renderer {
@@ -39,6 +43,10 @@ impl Renderer {
             contents: bytemuck::cast_slice(vtx_data),
             usage: BufferUsages::VERTEX,
         })
+    }
+
+    pub fn mesh_alloc(device: &Device, geometry: Geometries, subdivisions: u32) -> MeshAllocation {
+        MeshAllocation::new(device, &geometry.mesh(subdivisions))
     }
 
     pub fn render_pipeline(
@@ -60,7 +68,7 @@ impl Renderer {
             vertex: VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[Some(MeshDataDescriptor::LAYOUT)], //TODO add vertex buffers here
+                buffers: &[MeshDataDescriptor::LAYOUT], //TODO add vertex buffers here
                 compilation_options: PipelineCompilationOptions::default(),
             },
             primitive: primitive_state,
@@ -81,31 +89,32 @@ impl Renderer {
         })
     }
 
-    pub fn new(window: Window) -> Renderer {
+    pub async fn new(window: Window) -> Renderer {
         let window = Arc::new(window);
-        let instance = future::block_on(new_instance_with_webgpu_detection(
+
+        let instance = new_instance_with_webgpu_detection(
             InstanceDescriptor::new_without_display_handle(),
-        ));
+        ).await;
+
         {
             let surface = instance.create_surface(window.clone()).unwrap();
             let rq_opts = RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 force_fallback_adapter: false,
                 compatible_surface: Some(&surface),
-                apply_limit_buckets: false,
             };
-            let adapter = future::block_on(instance.request_adapter(&rq_opts)).unwrap();
+            let adapter = instance.request_adapter(&rq_opts).await.unwrap();
 
             let device_desc = DeviceDescriptor {
                 label: Some("Device Descriptor"),
-                required_features: Features::POLYGON_MODE_LINE,
+                required_features: Features::empty(), //TODO Features::POLYGON_MODE_LINE not supported on webgpu
                 required_limits: wgpu::Limits::defaults(),
                 experimental_features: ExperimentalFeatures::disabled(),
                 memory_hints: wgpu::MemoryHints::Performance,
                 trace: wgpu::Trace::Off,
             };
 
-            let (device, queue) = future::block_on(adapter.request_device(&device_desc)).unwrap();
+            let (device, queue) = adapter.request_device(&device_desc).await.unwrap();
 
             let size = window.inner_size();
 
@@ -119,9 +128,8 @@ impl Renderer {
             let surface_config = wgpu::SurfaceConfiguration {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 format: format,
-                color_space: wgpu::SurfaceColorSpace::Auto,
-                width: size.width,
-                height: size.height,
+                width: 800,
+                height: 800,
                 present_mode: wgpu::PresentMode::AutoNoVsync,
                 desired_maximum_frame_latency: 2,
                 alpha_mode: wgpu::CompositeAlphaMode::Opaque,
@@ -209,7 +217,7 @@ impl Renderer {
             Renderer {
                 window: window,
                 _instance: instance,
-                mesh_alloc: MeshAllocation::new(&device, &&polygonal_prism(gui.subdivisions)),
+                mesh_alloc: Self::mesh_alloc(&device, gui.selected_geometry, gui.subdivisions),
                 device: device,
                 queue: queue,
                 surface: surface,
@@ -281,8 +289,7 @@ impl Renderer {
                 {}
 
                 if self.gui.mesh_dirty {
-                    self.mesh_alloc =
-                        MeshAllocation::new(&self.device, &polygonal_prism(self.gui.subdivisions));
+                    self.mesh_alloc = Self::mesh_alloc(&self.device, self.gui.selected_geometry, self.gui.subdivisions);
                     render_pass.set_vertex_buffer(
                         MeshDataDescriptor::ATTRIBUTE.shader_location,
                         self.mesh_alloc.vtx_buffer.slice(..),
@@ -311,7 +318,7 @@ impl Renderer {
             );
 
             self.queue.submit(std::iter::once(encoder.finish()));
-            self.queue.present(output);
+            output.present();
         } else {
             log::warn!("not handled: {:?}", output);
         }
