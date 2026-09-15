@@ -16,7 +16,7 @@ strum = "0.28.0"
 strum_macros = "0.28.0"
 winit = "0.30.13"
 #pinned to last working wasm-compatible versions
-wgpu = { version = "29.0.4", features = ["spirv"] }
+wgpu = { version = "29.0.4", default-features = false, features = ["dx12","vulkan","metal","webgpu","spirv"] }
 egui = "0.35"
 egui-wgpu = "0.35"
 egui-winit = { version = "0.35", default-features = false }

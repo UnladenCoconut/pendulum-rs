@@ -86,15 +86,21 @@ impl Default for App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+
+        log::info!("App resumed");
         if let None = self.renderer {
-            let window = event_loop
-                .create_window(Window::default_attributes().with_inner_size(Size::Logical(
+
+            let win_attribs = Window::default_attributes().with_inner_size(Size::Logical(
                     LogicalSize {
                         width: 800.0,
                         height: 800.0,
                     },
-                )))
-                .unwrap();
+                ));
+            
+            #[cfg(target_arch = "wasm32")]
+            let win_attribs = win_attribs.with_append(true);
+
+            let window = event_loop.create_window(win_attribs).unwrap();
 
             
 
@@ -109,7 +115,9 @@ impl ApplicationHandler for App {
                     //     0,
                     //     bytes_of(&self.camera.update(&self.pressed_keys)),
                     // );
-                    tx.send(renderer);
+                    tx.send(renderer).unwrap_or_else(|_| {
+                        log::info!("failed to send renderer over oneshot channel rx end dropped)");
+                    });
                 });
             }
 
@@ -185,6 +193,7 @@ impl ApplicationHandler for App {
             }
 
             WindowEvent::Resized(size) => {
+                log::info!("window resized to ({},{})",size.width,size.height);
                 if let Some(renderer) = &mut self.renderer
                     && size.width != 0
                     && size.height != 0
@@ -260,6 +269,7 @@ impl ApplicationHandler for App {
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(start)]
 pub fn run_wasm() {
+    use winit::platform::web::EventLoopExtWebSys;
 
     // Redirects standard Rust panics (crashing code) to the browser console
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -270,11 +280,8 @@ pub fn run_wasm() {
     log::info!("Hi There from UnladenCoconut!");
 
     let event_loop = EventLoop::new().unwrap();
-    //event_loop.set_control_flow(ControlFlow::Poll);
-    event_loop.set_control_flow(ControlFlow::Wait);
+    event_loop.set_poll_strategy(winit::platform::web::PollStrategy::IdleCallback);
 
-    let mut app = App::default();
-    event_loop.run_app(&mut app).unwrap_or_else(|e| {
-        log::error!("failed to run app: {}",e);
-    });
+    let app = App::default();
+    event_loop.spawn_app(app);
 }

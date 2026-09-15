@@ -107,7 +107,7 @@ impl Renderer {
 
             let device_desc = DeviceDescriptor {
                 label: Some("Device Descriptor"),
-                required_features: Features::empty(), //TODO Features::POLYGON_MODE_LINE not supported on webgpu
+                required_features: Features::SHADER_DRAW_INDEX, //TODO Features::POLYGON_MODE_LINE not supported on webgpu. SHADER_DRAW_INDEX needed for SV_VertexID
                 required_limits: wgpu::Limits::defaults(),
                 experimental_features: ExperimentalFeatures::disabled(),
                 memory_hints: wgpu::MemoryHints::Performance,
@@ -125,11 +125,13 @@ impl Renderer {
                 panic!("format {:?} not in list of supported formats", format);
             }
 
+            log::info!("create surface with size: ({},{})",size.width,size.height);
+
             let surface_config = wgpu::SurfaceConfiguration {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 format: format,
-                width: 800,
-                height: 800,
+                width: size.width.max(1),
+                height: size.height.max(1),
                 present_mode: wgpu::PresentMode::AutoNoVsync,
                 desired_maximum_frame_latency: 2,
                 alpha_mode: wgpu::CompositeAlphaMode::Opaque,
@@ -141,7 +143,7 @@ impl Renderer {
             ////////////////////// shader stuff //////////////////////
 
             let shader = device
-                .create_shader_module(include_spirv!(concat!(env!("OUT_DIR"), "/shader.spirv")));
+                .create_shader_module(include_spirv!(concat!(env!("OUT_DIR"), "/shader-wireframe.spirv")));
 
             let camera_transform_buffer = device.create_buffer_init(&BufferInitDescriptor {
                 label: Some("Camera Matrix Uniform"),
@@ -208,10 +210,7 @@ impl Renderer {
                 &device,
                 &[Some(&bind_layout)],
                 format,
-                PrimitiveState {
-                    polygon_mode: gui.polygon_mode(),
-                    ..MeshDataDescriptor::PRIMITIVE_STATE
-                },
+                MeshDataDescriptor::PRIMITIVE_STATE,
             );
 
             Renderer {
@@ -244,10 +243,7 @@ impl Renderer {
                 &self.device,
                 &[Some(&self.bind_layout)],
                 self.format,
-                PrimitiveState {
-                    polygon_mode: self.gui.polygon_mode(),
-                    ..MeshDataDescriptor::PRIMITIVE_STATE
-                },
+                MeshDataDescriptor::PRIMITIVE_STATE
             );
         }
 

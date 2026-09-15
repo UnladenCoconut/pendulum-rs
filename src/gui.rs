@@ -3,8 +3,7 @@ use std::ops::RangeInclusive;
 use egui_wgpu::ScreenDescriptor;
 use strum::IntoEnumIterator;
 use wgpu::{
-    CommandEncoder, Device, Queue, RenderPassColorAttachment, RenderPassDescriptor,
-    rwh::HasDisplayHandle,
+    CommandEncoder, Device, PrimitiveTopology, Queue, RenderPassColorAttachment, RenderPassDescriptor, rwh::HasDisplayHandle,
 };
 
 use crate::geometry::Geometries;
@@ -25,15 +24,7 @@ pub struct GUI {
 }
 
 impl GUI {
-
-    //TODO cant use this on webgpu
-    pub fn polygon_mode(&self) -> wgpu::PolygonMode {
-        match self.wireframe_mode {
-            //true => wgpu::PolygonMode::Line,
-            _ => wgpu::PolygonMode::Fill,
-        }
-    }
-
+    
     pub fn new(device: &Device, display_target: &dyn HasDisplayHandle) -> Self {
         let ctx = egui::Context::default();
         Self {

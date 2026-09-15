@@ -69,6 +69,7 @@ pub struct Mesh {
     indices: Vec<TriangleIdxSet>,
 }
 
+#[derive(Debug)]
 pub struct MeshAllocation {
     pub vtx_buffer: Buffer,
     pub vtx_count: u32,
