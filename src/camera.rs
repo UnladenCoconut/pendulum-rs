@@ -24,19 +24,25 @@ pub struct Camera {
 impl Camera {
     delegate! {
         to self.move_control {
-            pub fn reset(&mut self);
             pub fn trans_dir(&self, pressed_keys: &BitSet) -> Vec3;
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.move_control.rotation = Quat::IDENTITY;
+        self.move_control.translation = Mat4::from_translation(Vec3::new(0.0, 0.0, -2.0));
     }
 
     pub fn new(mut move_control: MoveControl) -> Self {
         move_control.angular_velocity -= 1.0;
         move_control.trans_velocity -= 1.0;
-        Self {
+        let mut s = Self {
             move_control: move_control,
             projection: glam::camera::lh::proj::directx::perspective_infinite(80.0, 1.0, 0.1)
                 .mul_mat4(&Z_MAPPING_MAT),
-        }
+        };
+        s.reset();
+        s
     }
 
     pub fn update(&mut self, pressed_keys: &BitSet) -> Mat4 {

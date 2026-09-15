@@ -20,7 +20,6 @@ wgpu = { version = "29.0.4", default-features = false, features = ["dx12","vulka
 egui = "0.35"
 egui-wgpu = "0.35"
 egui-winit = { version = "0.35", default-features = false }
-
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11.11"
 smol = "2.0.2"

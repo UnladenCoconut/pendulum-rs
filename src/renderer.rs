@@ -1,5 +1,11 @@
 use std::{num::NonZero, sync::Arc};
 
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::{Instant, Duration};
+
+#[cfg(target_arch = "wasm32")]
+use web_time::{Instant, Duration};
+
 use bytemuck::cast_slice;
 use glam::Mat4;
 use wgpu::{
@@ -17,7 +23,10 @@ pub struct Renderer {
     pub queue: Queue,
     pub surface: Surface<'static>,
     pub surface_config: SurfaceConfiguration,
-    pub shader: ShaderModule,
+    
+    pub fill_shader: ShaderModule,
+    pub wireframe_shader: ShaderModule, 
+
     pub render_pipeline: RenderPipeline,
     pub mesh_alloc: MeshAllocation,
     pub bind_layout: BindGroupLayout,
@@ -28,6 +37,8 @@ pub struct Renderer {
     pub object_transform_buffer: Buffer,
 
     pub gui: GUI,
+
+    pub last_frame_time: Option<Instant>,
 
     //make sure this is the last field in the struct so that it is dropped last, s.t.
     // wgpu context is dropeed before closing winit context
@@ -105,6 +116,8 @@ impl Renderer {
             };
             let adapter = instance.request_adapter(&rq_opts).await.unwrap();
 
+            log::info!("WGPU Adapter: {:?}",adapter.get_info());
+
             let device_desc = DeviceDescriptor {
                 label: Some("Device Descriptor"),
                 required_features: Features::SHADER_DRAW_INDEX, //TODO Features::POLYGON_MODE_LINE not supported on webgpu. SHADER_DRAW_INDEX needed for SV_VertexID
@@ -119,31 +132,34 @@ impl Renderer {
             let size = window.inner_size();
 
             let caps = surface.get_capabilities(&adapter);
-            let format = TextureFormat::Rgba8Unorm;
-
-            if !caps.formats.contains(&format) {
-                panic!("format {:?} not in list of supported formats", format);
-            }
 
             log::info!("create surface with size: ({},{})",size.width,size.height);
 
-            let surface_config = wgpu::SurfaceConfiguration {
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                format: format,
-                width: size.width.max(1),
-                height: size.height.max(1),
-                present_mode: wgpu::PresentMode::AutoNoVsync,
-                desired_maximum_frame_latency: 2,
-                alpha_mode: wgpu::CompositeAlphaMode::Opaque,
-                view_formats: vec![format],
-            };
+            let surface_config = surface.get_default_config(&adapter, size.width.max(1), size.height.max(1)).unwrap();
+            
+            // let surface_config = wgpu::SurfaceConfiguration {
+            //     usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            //     format: format,
+            //     width: size.width.max(1),
+            //     height: size.height.max(1),
+            //     present_mode: wgpu::PresentMode::AutoNoVsync,
+            //     desired_maximum_frame_latency: 2,
+            //     alpha_mode: wgpu::CompositeAlphaMode::Opaque,
+            //     view_formats: vec![format],
+            // };
+
+            let format = surface_config.format;
+            log::info!("Surface format: {:?}", &format);
 
             surface.configure(&device, &surface_config);
 
             ////////////////////// shader stuff //////////////////////
 
-            let shader = device
-                .create_shader_module(include_spirv!(concat!(env!("OUT_DIR"), "/shader-wireframe.spirv")));
+            let fill_shader = device
+                .create_shader_module(include_wgsl!(concat!(env!("OUT_DIR"), "/shader.wgsl")));
+
+            let wireframe_shader = device
+                .create_shader_module(include_wgsl!(concat!(env!("OUT_DIR"), "/shader-wireframe.wgsl")));
 
             let camera_transform_buffer = device.create_buffer_init(&BufferInitDescriptor {
                 label: Some("Camera Matrix Uniform"),
@@ -203,7 +219,12 @@ impl Renderer {
             });
 
             ////////////////////////////////////////////////////////
-            let gui = GUI::new(&device, &window);
+            let gui = GUI::new(&device, &window, format.clone());
+
+            let shader = match gui.wireframe_mode {
+                true => &wireframe_shader,
+                false => &fill_shader
+            };
 
             let render_pipeline = Self::render_pipeline(
                 &shader,
@@ -221,7 +242,11 @@ impl Renderer {
                 queue: queue,
                 surface: surface,
                 surface_config: surface_config,
-                shader: shader,
+                format: format,
+
+                wireframe_shader: wireframe_shader,
+                fill_shader: fill_shader,
+                
                 render_pipeline: render_pipeline,
 
                 transform_bg: bind_group,
@@ -229,7 +254,8 @@ impl Renderer {
                 object_transform_buffer: object_transform_buffer,
 
                 bind_layout: bind_layout,
-                format: format,
+
+                last_frame_time: None,
 
                 gui: gui,
             }
@@ -237,9 +263,23 @@ impl Renderer {
     }
 
     pub fn pass(&mut self) {
+
+        let now = Instant::now();
+        let dt = match self.last_frame_time {
+            Some(last_frame_time) => now.duration_since(last_frame_time),
+            None => Duration::ZERO
+        };
+        self.last_frame_time = Some(now);
+
         if self.gui.wireframe_mode_dirty {
+
+            let shader = match self.gui.wireframe_mode {
+                true => &self.wireframe_shader,
+                false => &self.fill_shader
+            };
+
             self.render_pipeline = Self::render_pipeline(
-                &self.shader,
+                shader,
                 &self.device,
                 &[Some(&self.bind_layout)],
                 self.format,
@@ -311,6 +351,7 @@ impl Renderer {
                     size_in_pixels: [self.surface_config.width, self.surface_config.height],
                     pixels_per_point: self.window.scale_factor() as f32,
                 },
+                dt
             );
 
             self.queue.submit(std::iter::once(encoder.finish()));

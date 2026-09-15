@@ -271,16 +271,13 @@ impl ApplicationHandler for App {
 pub fn run_wasm() {
     use winit::platform::web::EventLoopExtWebSys;
 
-    // Redirects standard Rust panics (crashing code) to the browser console
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-
-    // Initializes console_log for the browser developer tools
     console_log::init_with_level(log::Level::Debug).expect("Couldn't init logger");
 
     log::info!("Hi There from UnladenCoconut!");
 
     let event_loop = EventLoop::new().unwrap();
-    event_loop.set_poll_strategy(winit::platform::web::PollStrategy::IdleCallback);
+    event_loop.set_poll_strategy(winit::platform::web::PollStrategy::Scheduler);
 
     let app = App::default();
     event_loop.spawn_app(app);

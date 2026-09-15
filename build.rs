@@ -34,13 +34,13 @@ fn main() {
             println!("cargo::warning=rebuilding shader {}", x.path().display());
 
             let mut xpb = PathBuf::from(x.path());
-            xpb.set_extension("spirv");
+            xpb.set_extension("wgsl");
             let spirv = PathBuf::from(env::var("OUT_DIR").unwrap()).join(xpb.file_name().unwrap());
 
             let args = &[
                 x.path().to_str().unwrap(),
                 "-target",
-                "spirv",
+                "wgsl",
                 "-o",
                 spirv.to_str().unwrap(),
             ];

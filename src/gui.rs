@@ -1,12 +1,18 @@
-use std::ops::RangeInclusive;
+use std::{fmt::format, ops::RangeInclusive};
 
 use egui_wgpu::ScreenDescriptor;
 use strum::IntoEnumIterator;
 use wgpu::{
-    CommandEncoder, Device, PrimitiveTopology, Queue, RenderPassColorAttachment, RenderPassDescriptor, rwh::HasDisplayHandle,
+    CommandEncoder, Device, PrimitiveTopology, Queue, RenderPassColorAttachment, RenderPassDescriptor, TextureFormat, rwh::HasDisplayHandle,
 };
 
 use crate::geometry::Geometries;
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::{Instant, Duration};
+
+#[cfg(target_arch = "wasm32")]
+use web_time::{Instant, Duration};
 
 pub struct GUI {
     pub context: egui::Context,
@@ -21,11 +27,14 @@ pub struct GUI {
 
     pub selected_geometry: Geometries,
     pub selected_geometry_dirty: bool,
+
+    pub frame_time_max: Duration,
+
 }
 
 impl GUI {
     
-    pub fn new(device: &Device, display_target: &dyn HasDisplayHandle) -> Self {
+    pub fn new(device: &Device, display_target: &dyn HasDisplayHandle, format: TextureFormat) -> Self {
         let ctx = egui::Context::default();
         Self {
             state: egui_winit::State::new(
@@ -39,7 +48,7 @@ impl GUI {
             context: ctx,
             renderer: egui_wgpu::Renderer::new(
                 device,
-                wgpu::TextureFormat::Rgba8Unorm,
+                format,
                 egui_wgpu::RendererOptions {
                     msaa_samples: 1,
                     depth_stencil_format: None,
@@ -55,6 +64,8 @@ impl GUI {
             selected_geometry: Geometries::Sphere,
             selected_geometry_dirty: true,
 
+            frame_time_max: Duration::ZERO,
+
         }
     }
 
@@ -66,6 +77,7 @@ impl GUI {
         view: &wgpu::TextureView,
         window: &winit::window::Window,
         screen_desc: ScreenDescriptor,
+        dt: Duration,
     ) {
         let input = self.state.take_egui_input(window);
         let mut output = self.context.run_ui(input, |_x| {
@@ -74,6 +86,21 @@ impl GUI {
                 .default_pos(egui::pos2(700.0, 100.0))
                 .default_open(true)
                 .show(&self.context, |ui| {
+
+                    if dt > self.frame_time_max {
+                        self.frame_time_max = dt;
+                    }
+
+                    let dt_ms = dt.as_millis();
+                    let fps = if dt_ms != 0 {
+                        1000u128/dt_ms
+                    } else {
+                        0
+                    };
+                    ui.label(format!("Framerate: {} FPS",fps));
+                    ui.label(format!("Frame time: {}ms",dt.as_millis()));
+                    ui.label(format!("Frame time max: {}ms",self.frame_time_max.as_millis()));
+
                     if ui
                         .checkbox(&mut self.wireframe_mode, "wireframe mode")
                         .changed()

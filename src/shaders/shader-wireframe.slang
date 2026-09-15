@@ -26,9 +26,9 @@ VertexOutput vs_main(VertexInput vin) {
     if (vin.ID % 3 == 0) {
         out.barycentric = float3(1.0, 0.0, 0.0);
     } else if (vin.ID % 3 == 1) {
-        out.barycentric = float3(1.0, 1.0, 0.0);
+        out.barycentric = float3(0.0, 1.0, 0.0);
     } else {
-        out.barycentric = float3(1.0, 0.0, 1.0);
+        out.barycentric = float3(0.0, 0.0, 1.0);
     }
     
     out.position = mul(transforms.camera, mul(transforms.object, vin.position));
@@ -44,8 +44,11 @@ struct FragOutput {
 FragOutput fs_main(VertexOutput v) {
     FragOutput out;
 
-    if (min(v.barycentric.x, min(v.barycentric.y, v.barycentric.z)) > 0.1) {
-        out.color = v.color;
-    }
+    float minBarry = min(v.barycentric.x, min(v.barycentric.y, v.barycentric.z));
+
+    //out.color = v.color;
+
+    out.color = lerp(v.color, float4(0.0, 0.0, 0.0, 1.0), smoothstep(0.0, 0.01, minBarry));
+
     return out;
 }

@@ -1,3 +1,4 @@
 /target
 src/shaders/*.spirv
+src/shaders/*.wgsl
 pkg/
