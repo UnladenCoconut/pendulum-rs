@@ -1,0 +1,47 @@
+on:
+  push:
+    branches:
+      - master
+jobs:
+  build:
+    name: cargo build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Slang Compiler
+        run: |
+          wget -q https://github.com/shader-slang/slang/releases/download/v2026.18/slang-2026.18-linux-x86_64-glibc-2.27.tar.gz -O slangc.tar.gz
+          mkdir /tmp/slangc
+          sudo tar -xzf slangc.tar.gz -C /tmp/slangc --wildcards 'bin/*' 'lib/*'
+          mkdir -p $HOME/.local/bin/ $HOME/.local/lib/
+          cp -r /tmp/slangc/bin/* $HOME/.local/bin/
+          cp -r /tmp/slangc/lib/* $HOME/.local/lib/
+
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: 'latest'
+
+      - run: wasm-pack build -t web -d site/pkg --release
+      - name: Upload web page artifacts
+        id: deploy-artifacts
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy-page.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Github Pages
+        id: deploy-page
+        uses: actions/deploy-pages@v4
+

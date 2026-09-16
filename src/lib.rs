@@ -29,6 +29,7 @@ mod gui;
 mod move_controller;
 mod renderer;
 mod util;
+mod shaders;
 
 use camera::*;
 use move_controller::*;

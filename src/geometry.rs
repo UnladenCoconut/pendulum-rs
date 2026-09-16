@@ -46,7 +46,7 @@ impl MeshDataDescriptor {
         //cull_mode: None,
         unclipped_depth: false,
         polygon_mode: wgpu::PolygonMode::Fill,
-        //polygon_mode: wgpu::PolygonMode::Line, //wireframe
+        //polygon_mode: wgpu::PolygonMode::Line, //wireframe, not supported on webgpu target
         conservative: false,
     };
 }

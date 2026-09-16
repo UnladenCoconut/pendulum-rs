@@ -45,3 +45,29 @@ fn test_linspace() {
     let v: Vec<_> = linspace::<f32, f32>(0.0, 1.0, 5).collect();
     println!("{:?}", v);
 }
+
+//we could ues a macro for reducing boilerplate around initialising and updating struct fields (namely for the renderer).
+/* 
+we might have some code like this:
+struct A {
+    T x,
+    T y,
+    T z
+
+}
+
+impl A {
+    fn new() -> Self {
+        x = fn_x_init();
+        y = fn_y_init(x);
+        z = fn_z_init(x,y);
+    }
+
+    fn update_z(&mut self) -> {
+        self.z = fn_z_init(self.x,self.y)
+    } 
+}
+update_z is the boilerplate around fn_z_init to remove the need to manually pass parameters.
+another solution would be to have every field as Option<T>, but then there is room to not initialise stuff 
+in the right order at runtime, and its an additional  `let SOme(z) = self.z {}` needed elsewhere anyway.
+*/ 
