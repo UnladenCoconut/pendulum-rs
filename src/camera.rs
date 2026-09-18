@@ -45,6 +45,12 @@ impl Camera {
         s
     }
 
+    pub fn update_projection(&mut self, vertical_fov: f32, aspect_ratio: f32) {
+        log::info!("camera update: fov: {}, aspect ratio: {}",vertical_fov, aspect_ratio);
+        self.projection = glam::camera::lh::proj::directx::perspective_infinite(vertical_fov, aspect_ratio, 0.1)
+            .mul_mat4(&Z_MAPPING_MAT);
+    }
+
     pub fn update(&mut self, pressed_keys: &BitSet) -> Mat4 {
         let now = Instant::now();
         let dt = now - self.move_control.last_update;

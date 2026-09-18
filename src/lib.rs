@@ -191,6 +191,7 @@ impl ApplicationHandler for App {
                         }
                     };
                 }
+
             }
 
             WindowEvent::Resized(size) => {
@@ -204,6 +205,14 @@ impl ApplicationHandler for App {
                     renderer
                         .surface
                         .configure(&renderer.device, &renderer.surface_config);
+
+                    self.camera.update_projection(80.0, (size.width as f32) / (size.height as f32));
+                    renderer.queue.write_buffer(
+                        &renderer.camera_transform_buffer,
+                        0,
+                        bytes_of(&self.camera.update(&self.pressed_keys)),
+                    );
+
                 }
             }
 
@@ -219,6 +228,14 @@ impl ApplicationHandler for App {
                         renderer.surface_config.height = size.height;
                         renderer.surface.configure(&renderer.device, &renderer.surface_config);
                     }
+
+                    self.camera.update_projection(80.0, (size.width as f32) / (size.height as f32));
+                    renderer.queue.write_buffer(
+                        &renderer.camera_transform_buffer,
+                        0,
+                        bytes_of(&self.camera.update(&self.pressed_keys)),
+                    );
+
                 }
             }
 
