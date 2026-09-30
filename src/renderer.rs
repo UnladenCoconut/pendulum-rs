@@ -14,7 +14,7 @@ use wgpu::{
 };
 use winit::window::Window;
 
-use crate::geometry::*;
+use crate::{geometry::*, shaders};
 use crate::gui::GUI;
 
 pub struct Renderer {
@@ -32,7 +32,7 @@ pub struct Renderer {
     pub bind_layout: BindGroupLayout,
     pub format: TextureFormat,
 
-    pub transform_bg: BindGroup,
+    pub bind_group: BindGroup,
     pub camera_transform_buffer: Buffer,
     pub object_transform_buffer: Buffer,
 
@@ -60,6 +60,33 @@ impl Renderer {
         MeshAllocation::new(device, &geometry.mesh(subdivisions))
     }
 
+    pub fn bind_group(bind_layout: &BindGroupLayout, device: &Device, vtx_buffer: &Buffer, camera_transform_buffer: &Buffer, object_transform_buffer: &Buffer) -> BindGroup {
+        device.create_bind_group(&BindGroupDescriptor {
+                        label: Some("Shader Bind Group"),
+                        layout: &bind_layout,
+                        entries: &[
+                            BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::Buffer(
+                                    vtx_buffer.as_entire_buffer_binding()
+                                )
+                            },
+                            BindGroupEntry {
+                                binding: 1,
+                                resource: wgpu::BindingResource::Buffer(
+                                    camera_transform_buffer.as_entire_buffer_binding(),
+                                ),
+                            },
+                            BindGroupEntry {
+                                binding: 2,
+                                resource: wgpu::BindingResource::Buffer(
+                                    object_transform_buffer.as_entire_buffer_binding(),
+                                ),
+                            },
+                        ],
+                    })
+    }
+
     pub fn render_pipeline(
         shader: &ShaderModule,
         device: &Device,
@@ -79,7 +106,7 @@ impl Renderer {
             vertex: VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[MeshDataDescriptor::LAYOUT], //TODO add vertex buffers here
+                buffers: &[shaders::LAYOUT], //TODO add vertex buffers here
                 compilation_options: PipelineCompilationOptions::default(),
             },
             primitive: primitive_state,
@@ -174,17 +201,17 @@ impl Renderer {
             });
 
             let bind_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("Camera Bind Group Layout"),
+                label: Some("Shader Bind Group Layout"),
                 entries: &[
                     BindGroupLayoutEntry {
                         binding: 0,
                         visibility: ShaderStages::VERTEX,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: NonZero::new(size_of::<glam::Mat4>() as u64),
+                        ty: wgpu::BindingType::Buffer { 
+                            ty: wgpu::BufferBindingType::Storage { read_only: true }, 
+                            has_dynamic_offset: false, 
+                            min_binding_size: NonZero::new(size_of::<Vertex>() as u64), 
                         },
-                        count: None,
+                        count: None
                     },
                     BindGroupLayoutEntry {
                         binding: 1,
@@ -196,31 +223,33 @@ impl Renderer {
                         },
                         count: None,
                     },
-                ],
-            });
-
-            let bind_group = device.create_bind_group(&BindGroupDescriptor {
-                label: Some("camera Bind Group"),
-                layout: &bind_layout,
-                entries: &[
-                    BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::Buffer(
-                            camera_transform_buffer.as_entire_buffer_binding(),
-                        ),
-                    },
-                    BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Buffer(
-                            object_transform_buffer.as_entire_buffer_binding(),
-                        ),
+                    BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: NonZero::new(size_of::<glam::Mat4>() as u64),
+                        },
+                        count: None,
                     },
                 ],
             });
 
-            ////////////////////////////////////////////////////////
             let gui = GUI::new(&device, &window, format.clone());
 
+            let mesh_alloc = Self::mesh_alloc(&device, gui.selected_geometry, gui.subdivisions);
+
+            let bind_group = Self::bind_group(
+                &bind_layout, 
+                &device, 
+                &mesh_alloc.vtx_buffer, 
+                &camera_transform_buffer, 
+                &object_transform_buffer);
+
+            ////////////////////////////////////////////////////////
+        
+    
             let shader = match gui.wireframe_mode {
                 true => &wireframe_shader,
                 false => &fill_shader
@@ -237,7 +266,7 @@ impl Renderer {
             Renderer {
                 window: window,
                 _instance: instance,
-                mesh_alloc: Self::mesh_alloc(&device, gui.selected_geometry, gui.subdivisions),
+                mesh_alloc: mesh_alloc,
                 device: device,
                 queue: queue,
                 surface: surface,
@@ -249,7 +278,7 @@ impl Renderer {
                 
                 render_pipeline: render_pipeline,
 
-                transform_bg: bind_group,
+                bind_group,
                 camera_transform_buffer: camera_transform_buffer,
                 object_transform_buffer: object_transform_buffer,
 
@@ -318,8 +347,6 @@ impl Renderer {
                     timestamp_writes: None,
                     occlusion_query_set: None,
                 });
-                render_pass.set_pipeline(&self.render_pipeline);
-                render_pass.set_bind_group(0, &self.transform_bg, &[]);
 
                 //update buffers
                 {}
@@ -327,18 +354,20 @@ impl Renderer {
                 if self.gui.mesh_dirty {
                     self.mesh_alloc = Self::mesh_alloc(&self.device, self.gui.selected_geometry, self.gui.subdivisions);
                     render_pass.set_vertex_buffer(
-                        MeshDataDescriptor::ATTRIBUTE.shader_location,
-                        self.mesh_alloc.vtx_buffer.slice(..),
-                    );
-
-                    render_pass.set_index_buffer(
+                        0u32,
                         self.mesh_alloc.idx_buffer.slice(..),
-                        MeshDataDescriptor::INDEX_FORMAT,
                     );
+                    self.bind_group = Self::bind_group(
+                        &self.bind_layout, 
+                        &self.device, 
+                        &self.mesh_alloc.vtx_buffer, 
+                        &self.camera_transform_buffer, 
+                        &self.object_transform_buffer);
                 }
 
-                //render_pass.draw(0..self.mesh_alloc.vtx_count, 0..1);
-                render_pass.draw_indexed(0..self.mesh_alloc.idx_count, 0, 0..1);
+                render_pass.set_pipeline(&self.render_pipeline);
+                render_pass.set_bind_group(0, &self.bind_group, &[]);
+                render_pass.draw(0..self.mesh_alloc.idx_count, 0..1);
             }
 
             self.gui.render(

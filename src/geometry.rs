@@ -25,18 +25,6 @@ pub type Vertex = glam::f32::Vec4;
 pub struct MeshDataDescriptor {}
 
 impl MeshDataDescriptor {
-    pub const ATTRIBUTE: VertexAttribute = VertexAttribute {
-        format: VertexFormat::Float32x4,
-        offset: 0,
-        shader_location: 0, //TODO static allocate this value
-    };
-    pub const LAYOUT: VertexBufferLayout<'static> = VertexBufferLayout {
-        array_stride: size_of::<Vertex>() as u64,
-        step_mode: wgpu::VertexStepMode::Vertex,
-        attributes: &[Self::ATTRIBUTE],
-    };
-
-    pub const INDEX_FORMAT: IndexFormat = IndexFormat::Uint32;
 
     pub const PRIMITIVE_STATE: PrimitiveState = PrimitiveState {
         topology: PrimitiveTopology::TriangleList,
@@ -85,13 +73,13 @@ impl MeshAllocation {
             vtx_buffer: device.create_buffer_init(&BufferInitDescriptor {
                 label: Some("Vertex Buffer"),
                 contents: cast_slice(&mesh.vertices),
-                usage: BufferUsages::VERTEX,
+                usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
             }),
             vtx_count: mesh.vertices.len() as u32,
             idx_buffer: device.create_buffer_init(&BufferInitDescriptor {
                 label: Some("Index Buffer"),
                 contents: cast_slice(&mesh.indices),
-                usage: BufferUsages::INDEX,
+                usage: BufferUsages::VERTEX,
             }),
             idx_count: (mesh.indices.len() * 3) as u32,
         }

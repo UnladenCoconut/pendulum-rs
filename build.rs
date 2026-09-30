@@ -15,7 +15,7 @@ fn main() {
     };
 
     println!("cargo::rerun-if-changed=src/shaders");
-    WalkDir::new("./src/shaders")
+    WalkDir::new("./src/shaders/src")
         .into_iter()
         .filter_map(|x| match x {
             Ok(e) => {
@@ -41,6 +41,8 @@ fn main() {
                 x.path().to_str().unwrap(),
                 "-target",
                 "wgsl",
+                "-I",
+                "./src/shaders/include",
                 "-o",
                 spirv.to_str().unwrap(),
             ];
