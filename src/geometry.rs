@@ -106,21 +106,21 @@ pub fn cube() -> Mesh {
             Vertex::new(1.0, 1.0, 1.0, 1.0),
         ],
         indices: vec![
-            //front
-            TriangleIdxSet(0, 1, 2),
-            TriangleIdxSet(0, 2, 3),
             //back
-            TriangleIdxSet(6, 5, 4),
-            TriangleIdxSet(7, 6, 4),
-            //left
-            TriangleIdxSet(0, 4, 1),
-            TriangleIdxSet(1, 4, 5),
+            TriangleIdxSet(0, 2, 1),
+            TriangleIdxSet(0, 3, 2),
+            //front
+            TriangleIdxSet(6, 4, 5),
+            TriangleIdxSet(7, 4, 6),
             //right
-            TriangleIdxSet(2, 6, 3),
-            TriangleIdxSet(3, 6, 7),
-            //top
-            TriangleIdxSet(0, 3, 4),
-            TriangleIdxSet(4, 3, 7),
+            TriangleIdxSet(0, 1, 4),
+            TriangleIdxSet(1, 5, 4),
+            //left
+            TriangleIdxSet(2, 3, 6),
+            TriangleIdxSet(3, 7, 6),
+            //bottom
+            TriangleIdxSet(0, 4, 3),
+            TriangleIdxSet(4, 7, 3),
             //bottom
             TriangleIdxSet(1, 2, 5),
             TriangleIdxSet(2, 6, 5),
@@ -138,7 +138,7 @@ pub fn polygonal_prism(sides: u32) -> Mesh {
             [
                 Vertex::new(a.sin(), 1.0, a.cos(), 1.0),
                 Vertex::new(a.sin(), -1.0, a.cos(), 1.0),
-            ]
+            ]   
         });
     let mut vtx: Vec<_> = vtx.flatten().collect();
 
@@ -166,21 +166,24 @@ pub fn polygonal_prism(sides: u32) -> Mesh {
     vtx.push(Vertex::new(0.0, -1.0, 0.0, 1.0));
 
     let vl = vtx.len() as u32;
-
+    let v_top_center = vl-2;
+    let v_bottom_center = vl-1;
     //top  and bottom circles
     (0u32..idx.len() as u32)
         .step_by(2)
         .tuple_windows::<(_, _)>()
         .for_each(|x| {
-            idx.push(TriangleIdxSet(vl - 2, x.0, x.1));
+            idx.push(TriangleIdxSet(v_top_center, x.0, x.1));
         });
+    idx.push(TriangleIdxSet(v_top_center, v_top_center - 2, 0));
 
     (1u32..idx.len() as u32)
         .step_by(2)
         .tuple_windows::<(_, _)>()
         .for_each(|x| {
-            idx.push(TriangleIdxSet(vl - 1, x.0, x.1));
+            idx.push(TriangleIdxSet(v_bottom_center, x.1, x.0));
         });
+    idx.push(TriangleIdxSet(v_bottom_center, 1, v_bottom_center - 2));
 
     // TODO
     //assert!(idx.len() == vtx.len(), "mesh idx list size did not match expected" );
