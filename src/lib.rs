@@ -4,6 +4,10 @@ use bit_set::BitSet;
 use bytemuck::bytes_of;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::wasm_bindgen::prelude::wasm_bindgen;
+
+#[cfg(not(target_arch = "wasm32"))]
+use winit::platform::wayland::WindowAttributesExtWayland;
+
 use std::error::Error;
 use std::f32::consts::PI;
 use winit::application::ApplicationHandler;
@@ -91,12 +95,17 @@ impl ApplicationHandler for App {
         log::info!("App resumed");
         if let None = self.renderer {
 
-            let win_attribs = Window::default_attributes().with_inner_size(Size::Logical(
+            let mut win_attribs = Window::default_attributes().with_inner_size(Size::Logical(
                     LogicalSize {
                         width: 800.0,
                         height: 800.0,
                     },
                 ));
+                
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    win_attribs = win_attribs.with_name("UnladenCoconut.pendulum-rs", "");
+                }
             
             #[cfg(target_arch = "wasm32")]
             let win_attribs = win_attribs.with_append(true);

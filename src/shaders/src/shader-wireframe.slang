@@ -24,13 +24,17 @@ struct FragOutput {
 FragOutput fs_main(VertexOutput v) {
     FragOutput out;
 
+    float uh = max(max(ddx(v.barycentric.x),ddy(v.barycentric.y)),0.01); // div 0 errors?
+    float line_thickness = uh;
+
+    //float uh = 1.0;
+    //float line_thickness = 0.01;
+
     float minBarry = min(v.barycentric.x, min(v.barycentric.y, v.barycentric.z));
 
     //out.color = v.color;
 
-    out.color = lerp(v.color, float4(0.0, 0.0, 0.0, 1.0), smoothstep(0.0, 0.01, minBarry));
+    out.color = lerp(v.color, float4(0.0, 0.0, 0.0, 1.0), smoothstep(0.0, line_thickness, minBarry));
 
     return out;
 }
-
-//barycentric coord is zero across an entire face for some?

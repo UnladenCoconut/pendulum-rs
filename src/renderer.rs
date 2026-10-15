@@ -9,8 +9,7 @@ use web_time::{Instant, Duration};
 use bytemuck::cast_slice;
 use glam::Mat4;
 use wgpu::{
-    util::{BufferInitDescriptor, DeviceExt, new_instance_with_webgpu_detection},
-    *,
+    util::{BufferInitDescriptor, DeviceExt, RenderEncoder, new_instance_with_webgpu_detection}, *,
 };
 use winit::window::Window;
 

@@ -28,6 +28,10 @@ pub struct GUI {
     pub selected_geometry: Geometries,
     pub selected_geometry_dirty: bool,
 
+    instances_str: (String,String),
+    pub instances: (u32,u32),
+    pub instances_dirty: bool,
+
     pub frame_time_max: Duration,
 
 }
@@ -63,6 +67,10 @@ impl GUI {
             wireframe_mode_dirty: false,
             selected_geometry: Geometries::Sphere,
             selected_geometry_dirty: true,
+            
+            instances_str: (String::new(),String::new()),
+            instances: (3,3),
+            instances_dirty: true,
 
             frame_time_max: Duration::ZERO,
 
@@ -134,6 +142,22 @@ impl GUI {
                     if before != self.selected_geometry {
                         self.mesh_dirty = true;
                     }
+
+                    // ui.horizontal(|ui| {
+                    //     ui.text_edit_singleline(&mut self.instances_str.0);
+                    //     ui.label("x");
+                    //     ui.text_edit_singleline(&mut self.instances_str.1);
+
+                    //     if let Ok(x) = self.instances_str.0.parse::<u32>() {
+                    //         self.instances.0 = x;
+                    //         self.instances_dirty = true;
+                    //     }
+
+                    //     if let Ok(y) = self.instances_str.1.parse::<u32>(){
+                    //         self.instances.1 = y;
+                    //         self.instances_dirty = true;
+                    //     }
+                    // })
 
                 });
         });
