@@ -146,7 +146,7 @@ impl Renderer {
 
             let device_desc = DeviceDescriptor {
                 label: Some("Device Descriptor"),
-                required_features: Features::SHADER_DRAW_INDEX, //TODO Features::POLYGON_MODE_LINE not supported on webgpu. SHADER_DRAW_INDEX needed for SV_VertexID
+                required_features: Features::default(),
                 required_limits: wgpu::Limits::defaults(),
                 experimental_features: ExperimentalFeatures::disabled(),
                 memory_hints: wgpu::MemoryHints::Performance,
